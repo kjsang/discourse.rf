@@ -9,6 +9,7 @@ pacman::p_load(
   KoNLP
 )
 
+
 # 데이터 불러오기 --------------------------------------------
 
 readxl::read_xlsx("rawdata.xlsx") -> rawdata
