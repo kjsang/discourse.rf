@@ -9,6 +9,17 @@ pacman::p_load(
   KoNLP, lubridate, tidylo
 )
 
+# 인용 (패키지 및 R 버전)
+citation()
+citation("tidyverse")
+citation("readxl")
+citation("lubridate")
+citation("tidylo")
+citation("tidytext")
+citation("KoNLP")
+
+# R Studio 버전 
+RStudio.Version()
 
 # 데이터 불러오기 --------------------------------------------
 readxl::read_xlsx("keyword.xlsx") -> keyword
@@ -20,6 +31,7 @@ keyword %>%
   left_join(char, by = "id") %>% 
   select(id, 일자, 언론사, 제목, 인물, 키워드, 정보원, 인용문) -> rawdata
 
+citation("NIADic")
 
 # 사전 불러오기 ---------------------------------------------
 
@@ -183,17 +195,10 @@ data_tb %>%
               str_remove_all("\\d+")
             ) -> data_tb
 
-data_tb %>% 
-  filter(시기 == "초기") %>% 
-  filter(인용문 %>% str_detect("만원"))
-
 
 par(family = "AppleGothic")
 theme_set(theme_gray(base_family = 'AppleGothic'))
 
-data_tb %>% 
-  filter(시기 == "초기") %>% 
-  filter(정보원 == "통합당_심재철")
 
 
 # 시기별 담론 내 행위자 출현 빈도분석 
@@ -380,3 +385,76 @@ data_tb %>%
 # 후기 (4월 30일 ~ 5월 4일)
 data_tb %>% 
   filter(시기 == "후기")
+
+
+# 미국 추이 살펴보기
+
+predata_ver2 %>% 
+  filter(정보원 %>%  str_detect("전문가집단_")) -> data_tb_미국
+
+data_tb_미국 %>% 
+  select(일자, 정보원, 인용문) %>% 
+  mutate(일자_0317 = ifelse(month(일자) == 3 & day(일자) < 17, "미국이전",
+                          ifelse(month(일자) == 3 & day(일자) < 30, "미국이후", "완전이후"))) %>% 
+  filter(정보원 %>% str_detect("전문가집단_")) %>% 
+  count(정보원)
+
+
+data_tb_미국 %>% 
+  select(일자, 정보원, 인용문) %>% 
+  filter(정보원 %>% str_detect("전문가집단")) %>% 
+  mutate(인용문 = SimplePos09(인용문) %>% 
+              unlist() %>% 
+              paste(collapse = " ") %>% 
+              str_extract_all(regex('[^\\s]+/N')) %>%
+              paste(collapse = ' ') %>% 
+              str_remove_all('/N') %>% 
+              str_remove_all(stopping_ko_end)
+  ) %>% 
+  ungroup() %>%
+  unnest_tokens(단어, 인용문) %>% 
+  anti_join(stopping_ko) %>% 
+  filter(str_length(단어) > 1) %>% 
+  mutate(단어 = ifelse(단어 %>%  str_detect("미국"), "미국", 단어)) %>% 
+  group_by(일자) %>% 
+  count(단어) %>% 
+  arrange(desc(n)) -> 단어
+
+
+단어 %>% 
+  arrange(일자) %>% 
+  filter(단어 %>% str_detect("미국")) %>% 
+  mutate(주차 = (lubridate::week(일자) - 8) %>% 
+             as.factor() %>% 
+             paste0("주차")) %>% 
+  ggplot(aes(x = fct_reorder(주차, 일자), y = n)) +
+  geom_col() +
+  ylim(0, 300)
+  
+  
+# 초기 담론 살펴보기
+data_tb %>% 
+  filter(시기 == "초기") %>% 
+  mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당"), "중립", 
+                          ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당"), "찬성", "반대"))) %>% 
+  filter(연합구분 == "반대") %>% 
+  select(정보원, 인용문) %>%
+  filter(정보원 == "통합당_심재철") %>% 
+  head(20)
+
+# 데이터 정리 (네트워크를 위한 전처리)
+data_tb %>% 
+  group_by(id) %>% 
+  mutate(인용문 = SimplePos09(인용문) %>% 
+              unlist() %>% 
+              paste(collapse = " ") %>% 
+              str_extract_all(regex('[^\\s]+/N')) %>%
+              paste(collapse = ' ') %>% 
+              str_remove_all('/N') %>% 
+              str_remove_all(stopping_ko_end)
+  ) %>% 
+  ungroup() %>%
+  unnest_tokens(단어, 인용문) %>% 
+  anti_join(stopping_ko) %>% 
+  filter(str_length(단어) > 1) -> data_tb_SNA
+data_tb_SNA
