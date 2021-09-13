@@ -37,8 +37,12 @@ citation("NIADic")
 
 useNIADic()
 my_dic <- data.frame(
-  c("100만원", "재난지원금", "재난기본소득", "긴급재난지원금", "코로나19", "코로나 19", "문재인", "추가경정예산", "지원범위", "지원대상", "지원금액"),
-  c("nqq", "nqq", "nqq", "nqq", "nqq", "nqq", "nqpc", "nqq", "nqq", "nqq", "nqq")
+  c("100만원", "재난지원금", "재난기본소득", "긴급재난지원금", "코로나19", 
+    "문재인", "추가경정예산", "지원범위", "지원대상", "지원금액",
+    "마중물"),
+  c("nqq", "nqq", "nqq", "nqq", "nqq", 
+    "nqq", "nqq", "nqq", "nqq", "nqq",
+    "nqq")
 )
 buildDictionary(ext_dic = "NIADic",
                 user_dic = my_dic)
@@ -47,7 +51,7 @@ stopping_ko_end=regex("입니다$|이다$")
 stopping_ko=tibble(단어=c('이','가','은','는',
                           "정부", "국민", "우리", "이번", "논의", "억원", "오늘", "이후", "취지"))
 
-# 데이터 전처리 ---------------------------------------------
+# 데이터 전처리: 정보원 ---------------------------------------------
 
 rawdata %<>% 
   filter(!정보원 %in% c("unknownactor", NA)) %>%
@@ -99,7 +103,7 @@ predata_ver1 %>%
     정보원 = ifelse(정보원 %>%  str_detect("김경수"), "민주당_김경수_광역자치단체", 정보원),
     정보원 = ifelse(정보원 %>%  str_detect("박원순"), "민주당_박원순_광역자치단체", 정보원),
     정보원 = ifelse(정보원 %>%  str_detect("이철우"), "통합당_이철우_광역자치단체", 정보원),
-    정보원 = ifelse(정보원 %>%  str_detect("조경태"), "민주당_조경태", 정보원),
+    정보원 = ifelse(정보원 %>%  str_detect("조경태"), "통합당_조경태", 정보원),
     정보원 = ifelse(정보원 %>%  str_detect("문희상"), "민주당 문희상", 정보원),
     정보원 = ifelse(정보원 %>%  str_detect("박주민"), "민주당_박주민", 정보원),
     정보원 = ifelse(정보원 %>%  str_detect("전해철"), "민주당_전해철", 정보원),
@@ -152,16 +156,6 @@ predata_ver1 %>%
   filter(!정보원 %>%  str_detect("김 씨|코로나|관계자|국민|김 의원|재원|제기|원내대표")) -> predata_ver2
 
 predata_ver2 %>% 
-  filter(인용문 %>%  str_detect("코로나")) %>% 
-  select(인용문) %>% 
-  count(정보원) %>% 
-  arrange(desc(n)) %>% 
-  as.data.frame()
-
-predata_ver2 %>% 
-  filter(정보원 %>%  str_detect("제기"))
-
-predata_ver2 %>% 
   select(정보원) %>% 
   count(정보원) %>% 
   arrange(desc(n)) %>% 
@@ -187,21 +181,21 @@ data_tb %>%
   mutate(id = 1:length(인용문)) %>% 
   select(id, 일자, 시기,  정보원,  인용문) %>% 
   mutate(인용문 = 인용문 %>% 
-              str_replace_all("코로나19", "코로나") %>% 
+              str_replace_all("코로나19", "코로나바이러스") %>% 
               str_replace_all("100만원", "백만원") %>% 
               str_replace_all("50만원", "오십만원") %>% 
-              str_replace_all("투자하", "투자") %>% 
-              str_replace_all("포퓰리즘에", "포퓰리즘") %>% 
-              str_remove_all("\\d+")
+              str_replace_all("\\r", "") %>% 
+              str_replace_all("\\n", "") %>% 
+              str_replace_all("재난 지원금", "재난지원금") %>% 
+              str_replace_all("[^가-힣 ]", " ") %>% 
+              str_replace_all("하겠|하겠나|하겠다|하라고|을|를|것|했다", " ")
             ) -> data_tb
+data_tb %>% 
+  filter(인용문 %>% str_detect("코로나"))
 
 
 par(family = "AppleGothic")
 theme_set(theme_gray(base_family = 'AppleGothic'))
-
-data_tb %>% 
-  filter(정보원 == "전문가집단_윤형중")
-
 
 # 시기별 담론 내 행위자 출현 빈도분석 
 
@@ -215,6 +209,7 @@ data_tb %>%
   ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
+  facet_wrap(~연합구분, drop = F, scales = "free_y") +
   ggtitle("행위자 출현 빈도: 초기") +
   xlab("행위자") +
   ylab("출현빈도수") +
@@ -223,79 +218,120 @@ data_tb %>%
 
 data_tb %>% 
   filter(시기 == "중기_총선이전") %>% 
-  count(시기, 정보원) %>% 
+  filter(정보원 == "정부") %>% 
+  as.data.frame()
+
+data_tb %>% 
+  filter(시기 == "중기_총선이전") %>% 
+  mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균"), "찬성", 
+                          ifelse(정보원 %in% c("통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부"), "반대", "중립"))) %>% 
+  count(시기, 정보원, 연합구분) %>% 
+  filter(!정보원 == "정부") %>% 
   slice_max(n, n = 20) %>% 
-  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 정보원)) +
+  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
+  facet_wrap(~연합구분, drop = F, scales = "free_y") +
   theme(legend.position = "none") +
   ggtitle("행위자 출현 빈도: 중기_총선이전")
 
 data_tb %>% 
   filter(시기 == "중기_총선이후") %>% 
-  count(시기, 정보원) %>% 
+  mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균", "민주당_이근형", "민주당_박주민", "민주당_조정식", "정부", "더불어시민당"), "찬성", 
+                          ifelse(정보원 %in% c("통합당_조경태", "통합당_심재철", "통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부"), "반대", "중립"))) %>% 
+  count(시기, 정보원, 연합구분) %>% 
   slice_max(n, n = 20) %>% 
-  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 정보원)) +
+  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
+  facet_wrap(~연합구분, drop = F, scales = "free_y") +
   theme(legend.position = "none") +
   ggtitle("행위자 출현 빈도: 중기_총선이후")
 
 data_tb %>% 
   filter(시기 == "후기") %>% 
-  count(시기, 정보원) %>% 
+  mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균", "민주당_이근형", "민주당_박주민", "민주당_조정식", "정부", "더불어시민당"), "찬성", 
+                          ifelse(정보원 %in% c("통합당_조경태", "통합당_심재철", "통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부"), "반대", "중립"))) %>% 
+  count(시기, 정보원, 연합구분) %>% 
   slice_max(n, n = 10) %>% 
-  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 정보원)) +
+  ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
+  facet_wrap(~연합구분, drop = F, scales = "free_y") +
   theme(legend.position = "none") +
   ggtitle("행위자 출현 빈도: 후기")
 
 
-# 시기별 네트워크 분석 -----------------------------------------
+# 시기별 단어 빈도분석 -----------------------------------------
 data_tb %>% 
     filter(인용문 %>% str_detect("대학생") & 시기 == "중기_총선이전")
   
 
 data_tb %>% 
-  group_by(id) %>% 
-  mutate(인용문 = SimplePos09(인용문) %>% 
-              unlist() %>% 
-              paste(collapse = " ") %>% 
-              str_extract_all(regex('[^\\s]+/N')) %>%
-              paste(collapse = ' ') %>% 
-              str_remove_all('/N') %>% 
-              str_remove_all(stopping_ko_end)
-  ) %>% 
-  ungroup() %>%
-  unnest_tokens(단어, 인용문) %>% 
-  anti_join(stopping_ko) %>% 
-  filter(str_length(단어) > 1) -> data_tb_word
-data_tb_word %>% 
-  filter(단어 %>% str_detect(" ")) %>% 
-  count(단어)
+  as_tibble() %>% 
+  unnest_tokens(input = 인용문,
+                output = 단어,
+                token = extractNoun,
+                drop = F) %>% 
+  select(-인용문) -> data_tb_word
+
+data_tb_word %>% # 44,619 데이터 추출
+  filter(단어 %>% str_length() > 1) %>% # 한 글자 단어 제거 33,832
+  filter(단어 %>% str_length() <= 10) %>% # 열 글자를 초과하는  단어 제거 33,841
+  mutate(단어 = 단어 %>% 
+           str_replace_all("\\.", "")
+  ) -> data_tb_word # 결과적으로 33,777
 
 data_tb_word %>% 
   mutate(
-    단어 = ifelse(단어 %>%  str_detect("오십만원"), "오십만원", 단어),
-    단어 = ifelse(단어 %>%  str_detect("^만원"), "", 단어),
-    단어 = ifelse(단어 %>%  str_detect("겨를"), "", 단어),
-    단어 = ifelse(단어 %>%  str_detect("코로나"), "코로나19", 단어),
-    단어 = ifelse(단어 %>%  str_detect("코로나"), "코로나19", 단어),
-    단어 = ifelse(단어 %>%  str_detect("생각"), "생각", 단어),
-    단어 = ifelse(단어 %>%  str_detect("어렵"), "", 단어),
+    단어 = ifelse(단어 %>% str_detect("만명|저희|마디|생각|가운데|측면|자세|여부|사람들|운영|사실상|말씀|되기|해당|당초|그것|국면|이것|않았다|누구|전체|도내|다음|여러분|방침|이전|자료|이하|하루|이야기|아니다|일정|이상|이후|하자|만큼|모두|가능|사람|때문|들이|우리|하기"), "", 단어),
+    단어 = ifelse(단어 %>%  str_detect("긴급재난지원금|재난지원금"), "긴급재난지원금",
+                  ifelse(단어 %>%  str_detect("정부지원금"), "정부지원금",
+                           ifelse(단어 %>%  str_detect("지원금"), "지원금", 단어))), # 지원금 관련 단어 통합
+    단어 = ifelse(단어 %>%  str_detect("백만원"), "백만원", 
+                  ifelse(단어 %>% str_detect("오십만원"), "오십만원",
+                         ifelse(단어 %>% str_detect("만원"), "", 단어))), # ~만원 단어 정리
+    단어 = ifelse(단어 %>%  str_detect("건강보험료"), "건강보험료",
+                  ifelse(단어 %>% str_detect("보험료"), "보험료", 단어)), # 보험료 단어 통합
+    단어 = ifelse(단어 %>%  str_detect("코로나"), "코로나바이러스", 단어),
+    단어 = ifelse(단어 %>%  str_detect("포퓰리즘"), "포퓰리즘", 단어),
+    단어 = ifelse(단어 %>%  str_detect("현금"), "현금", 단어),
     단어 = ifelse(단어 %>%  str_detect("동의하기") & 시기 == "초기", "동의하기어려움", 단어), # 초기 동의하기 검색 결과 모든 "동의하기" 이후 어렵다가 이어져 나오기 때문에 동의하기 어려움으로 코딩하였음
-    단어 = ifelse(단어 %>%  str_detect("만명"), "", 단어),
-    단어 = ifelse(단어 %>%  str_detect("저희"), "", 단어),
+    단어 = ifelse(단어 %>%  str_detect("문재인|대통령"), "문재인대통령", 단어), # 대통령 단어 통합
+    단어 = ifelse(단어 %>%  str_detect("김종인"), "김종인", 단어), # 인물 단어 통합
+    단어 = ifelse(단어 %>%  str_detect("기획재정부|기재부"), "기획재정부", # 기획재정부, 정부, 중앙정부, 지방정부 등 통합
+                  ifelse(단어 %>%  str_detect("지방정부"), "지방정부",
+                           ifelse(단어 %>%  str_detect("재정부담"), "재정부담",
+                                    ifelse(단어 %>%  str_detect("정부지원금"), "정부지원금",
+                                             ifelse(단어 %>%  str_detect("부정부패"), "부정부패",
+                                                      ifelse(단어 %>%  str_detect("중앙정부"), "중앙정부",
+                                                               ifelse(단어 %>%  str_detect("정부"), "정부", 단어))))))),
     단어 = ifelse(단어 %>%  str_detect("마디"), "", 단어), # 황교안 대표의 "한 마디로" 라는 단어가 형태소 분석 결과 표현된 형태
     단어 = ifelse(단어 %>%  str_detect("윤석열"), "윤석열", 단어),
-    단어 = ifelse(단어 %>%  str_detect("윤석열"), "윤석열", 단어),
+    단어 = ifelse(단어 %>%  str_detect("마중"), "마중물", 단어)
   ) %>% 
-  filter(!is.na(단어))-> data_tb_word
+  filter(!is.na(단어))-> data_tb_word_prep
 
+data_tb_word_prep %>% 
+  filter(str_length(단어) > 1) %>% 
+  group_by(단어) %>% 
+  count() %>% 
+  arrange(desc(n)) %>% 
+  as.data.frame() %>% 
+  filter(단어 %>% str_detect("마중"))
+
+
+# 빈도가 2 이하인 단어는 추출하여 제외
+data_tb_word_prep %>% 
+  count(단어) %>% 
+  filter(!n >= 3) -> anti_word
+data_tb_word_prep %<>% anti_join(anti_word) # 29,325
+
+data_tb_word_prep %>% 
+  filter(str_length(단어) > 1)
 
 # 초기 (2월 27일 ~ 3월 17일)
-data_tb_word %>% 
+data_tb_word_prep %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령","민주당_이인영", "민주당"), "중립", 
                           ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당", "전문가집단_윤형중"), "찬성", "반대"))) %>% 
   filter(시기 == "초기") -> data_tb_초기 
