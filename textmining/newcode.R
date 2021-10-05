@@ -1,15 +1,16 @@
 
-# 패키지 로드 ----------------------------------------------
+# 0.1. 패키지 로드 ----------------------------------------------
 
 if (!require("pacman")) (install.packages("pacman"))
 pacman::p_load(
   tidyverse, magrittr,
   readxl,
   tidytext,
-  KoNLP, lubridate, tidylo
+  KoNLP, lubridate, tidylo,
+  gridExtra # 화면분할
 )
 
-# 인용 (패키지 및 R 버전)
+# 0.2. 인용 (패키지 및 R 버전) -------------------------------------
 citation()
 citation("tidyverse")
 citation("readxl")
@@ -17,11 +18,10 @@ citation("lubridate")
 citation("tidylo")
 citation("tidytext")
 citation("KoNLP")
-
-# R Studio 버전 
+citation("NIADic")
 RStudio.Version()
 
-# 데이터 불러오기 --------------------------------------------
+# 1.1. 데이터 불러오기 --------------------------------------------
 readxl::read_xlsx("keyword.xlsx") -> keyword
 readxl::read_xlsx("character.xlsx") -> char
 keyword %<>%  rename(id = `뉴스 식별자`)
@@ -31,9 +31,7 @@ keyword %>%
   left_join(char, by = "id") %>% 
   select(id, 일자, 언론사, 제목, 인물, 키워드, 정보원, 인용문) -> rawdata
 
-citation("NIADic")
-
-# 사전 불러오기 ---------------------------------------------
+# 1.2. 사전 불러오기 ---------------------------------------------
 
 useNIADic()
 my_dic <- data.frame(
@@ -51,7 +49,7 @@ stopping_ko_end=regex("입니다$|이다$")
 stopping_ko=tibble(단어=c('이','가','은','는',
                           "정부", "국민", "우리", "이번", "논의", "억원", "오늘", "이후", "취지"))
 
-# 데이터 전처리: 정보원 ---------------------------------------------
+# 2.1. 데이터 전처리: 정보원 ---------------------------------------------
 
 rawdata %<>% 
   filter(!정보원 %in% c("unknownactor", NA)) %>%
@@ -159,16 +157,18 @@ predata_ver2 %>%
   select(정보원) %>% 
   count(정보원) %>% 
   arrange(desc(n)) %>% 
-  filter(n >= 5) %>% 
-  select(정보원) -> data_upper5
+  filter(n >= 3) %>% # 발언 3회 이상인 행위자 추출
+  select(정보원) -> data_upper3
 
-data_upper5 %>% 
+data_upper3 %>% 
   as.data.frame()
 
-data_upper5 %>% 
+data_upper3 %>% 
   left_join(predata_ver2, by = "정보원") -> data_tb
 
-data_tb %>% 
+# 2.2. 데이터 전처리: 일자 추가 -------------------------------------------
+
+data_tb %>% # 1,504 건 추출
   arrange(일자)
 
 data_tb %>%
@@ -190,18 +190,18 @@ data_tb %>%
               str_replace_all("[^가-힣 ]", " ") %>% 
               str_replace_all("하겠|하겠나|하겠다|하라고|을|를|것|했다", " ")
             ) -> data_tb
-data_tb %>% 
-  filter(인용문 %>% str_detect("코로나"))
 
+# 2.3. 데이터 전처리 : 기본환경 설정 -----------------------------------
 
 par(family = "AppleGothic")
 theme_set(theme_gray(base_family = 'AppleGothic'))
 
-# 시기별 담론 내 행위자 출현 빈도분석 
+# 3.1. 시기별 담론 내 행위자 출현 빈도분석: 초기  ------------------------------
 
 data_tb %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령","민주당_이인영", "민주당"), "중립", 
-                          ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당", "전문가집단_윤형중"), "찬성", "반대"))) %>% 
+                          ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체",
+                                            "민주당_박원순_광역자치단체", "정의당", "전문가집단_윤형중"), "찬성", "반대"))) %>% 
   filter(시기 == "초기") %>% 
   group_by(연합구분) %>% 
   count(시기, 정보원) %>% 
@@ -209,17 +209,15 @@ data_tb %>%
   ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = F, scales = "free_y") +
-  ggtitle("행위자 출현 빈도: 초기") +
+  facet_wrap(~연합구분, drop = F, scales = "free_y", nrow = 3) +
   xlab("행위자") +
   ylab("출현빈도수") +
   geom_text(aes(label = n), hjust = -1) +
-  ylim(0, 18)
+  ylim(0, 18) +
+  theme(legend.position="none") -> 행위자_초기
+행위자_초기
 
-data_tb %>% 
-  filter(시기 == "중기_총선이전") %>% 
-  filter(정보원 == "정부") %>% 
-  as.data.frame()
+# 3.2. 시기별 담론 내 행위자 출현 빈도분석: 중기_총선이전 ------------------
 
 data_tb %>% 
   filter(시기 == "중기_총선이전") %>% 
@@ -231,10 +229,14 @@ data_tb %>%
   ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = F, scales = "free_y") +
+  facet_wrap(~연합구분, drop = F, scales = "free_y", nrow = 2) +
   theme(legend.position = "none") +
-  ggtitle("행위자 출현 빈도: 중기_총선이전")
+  ggtitle("행위자 출현 빈도: 중기_총선이전") +
+  xlab("행위자") +
+  ylab("출현빈도수") -> 행위자_중기_총선이전
+행위자_중기_총선이전
 
+# 3.3. 시기별 담론 내 행위자 출현 빈도분석: 중기_총선이후 ------------------
 data_tb %>% 
   filter(시기 == "중기_총선이후") %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균", "민주당_이근형", "민주당_박주민", "민주당_조정식", "정부", "더불어시민당"), "찬성", 
@@ -244,10 +246,14 @@ data_tb %>%
   ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = F, scales = "free_y") +
+  facet_wrap(~연합구분, drop = F, scales = "free_y", nrow = 2) +
   theme(legend.position = "none") +
-  ggtitle("행위자 출현 빈도: 중기_총선이후")
+  ggtitle("행위자 출현 빈도: 중기_총선이후") +
+  xlab("행위자") +
+  ylab("출현빈도수") -> 행위자_중기_총선이후
+행위자_중기_총선이후
 
+# 3.4. 시기별 담론 내 행위자 출현 빈도분석: 후기 -----------------------
 data_tb %>% 
   filter(시기 == "후기") %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균", "민주당_이근형", "민주당_박주민", "민주당_조정식", "정부", "더불어시민당"), "찬성", 
@@ -257,15 +263,14 @@ data_tb %>%
   ggplot(aes(x = fct_reorder(정보원, n), y = n, fill = 연합구분)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = F, scales = "free_y") +
+  facet_wrap(~연합구분, drop = F, scales = "free_y", nrow = 2) +
   theme(legend.position = "none") +
-  ggtitle("행위자 출현 빈도: 후기")
+  ggtitle("행위자 출현 빈도: 후기") +
+  xlab("행위자") +
+  ylab("출현빈도수") -> 행위자_후기
+행위자_후기
 
-
-# 시기별 단어 빈도분석 -----------------------------------------
-data_tb %>% 
-    filter(인용문 %>% str_detect("대학생") & 시기 == "중기_총선이전")
-  
+# 4.0. 토큰화 및 명사 추출 -----------------------------------------
 
 data_tb %>% 
   as_tibble() %>% 
@@ -275,12 +280,14 @@ data_tb %>%
                 drop = F) %>% 
   select(-인용문) -> data_tb_word
 
-data_tb_word %>% # 44,619 데이터 추출
-  filter(단어 %>% str_length() > 1) %>% # 한 글자 단어 제거 33,832
-  filter(단어 %>% str_length() <= 10) %>% # 열 글자를 초과하는  단어 제거 33,841
+data_tb_word %>% # 47,719 데이터 추출
+  filter(단어 %>% str_length() > 1) %>% # 한 글자 단어 제거 35,954
+  filter(단어 %>% str_length() <= 10) %>% # 열 글자를 초과하는  단어 제거 35,902
   mutate(단어 = 단어 %>% 
            str_replace_all("\\.", "")
-  ) -> data_tb_word # 결과적으로 33,777
+  ) -> data_tb_word # 결과적으로 35,902
+
+# 4.1. 데이터 전처리 : 불용어 제거 및 단어통합 ------------------------
 
 data_tb_word %>% 
   mutate(
@@ -312,6 +319,7 @@ data_tb_word %>%
   ) %>% 
   filter(!is.na(단어))-> data_tb_word_prep
 
+# 단어확인용
 data_tb_word_prep %>% 
   filter(str_length(단어) > 1) %>% 
   group_by(단어) %>% 
@@ -321,139 +329,210 @@ data_tb_word_prep %>%
   filter(단어 %>% str_detect("마중"))
 
 
-# 빈도가 2 이하인 단어는 추출하여 제외
+# 4.2. 데이터 전처리 : 빈도수 기준 제거 -------------------------
+
 data_tb_word_prep %>% 
   count(단어) %>% 
-  filter(!n >= 3) -> anti_word
-data_tb_word_prep %<>% anti_join(anti_word) # 29,325
+  filter(!n >= 2) -> anti_word
+data_tb_word_prep %<>% anti_join(anti_word) # 33,055
+data_tb_word_prep %<>% filter(str_length(단어) > 1) # 공백 제거
+data_tb_word_prep # 31,071
 
-data_tb_word_prep %>% 
-  filter(str_length(단어) > 1)
 
-# 초기 (2월 27일 ~ 3월 17일)
+# 5.1.1. TF-IDF: 초기 -------------------------------------
+행위자_초기
 data_tb_word_prep %>% 
+  filter(시기 == "초기") %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령","민주당_이인영", "민주당"), "중립", 
                           ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당", "전문가집단_윤형중"), "찬성", "반대"))) %>% 
-  filter(시기 == "초기") -> data_tb_초기 
-data_tb_초기 %>% 
-  group_by(연합구분) %>% 
-  count(단어) %>% 
-  arrange(desc(n)) %>% 
-  slice_max(n, n = 10, with_ties = F) %>% 
-  ggplot(aes(x = fct_reorder(단어, n), y = n, fill = 연합구분)) +
+  filter(정보원 %in% c("청와대", "문재인대통령", "민주당_이인영", "민주당", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당", "전문가집단_윤형중", "기획재정부_홍남기", "통합당_심재철", "기획재정부", "통합당_황교안", "국무총리_정세균", "광역자치단체_대구시")) %>% 
+  count(연합구분, 단어, sort = T) %>% 
+  bind_tf_idf(단어, 연합구분, n) -> data_tf_idf_초기
+
+# 5.1.2. weighted_log_odds비: 초기 ------------------------
+data_tf_idf_초기 %>% 
+  bind_log_odds(set = 연합구분,
+                feature = 단어,
+                n = n) %>% 
+  rename(log_odds = "log_odds_weighted") -> data_tf_idf_odds_초기
+data_tf_idf_odds_초기
+
+# 5.1.3. 단순빈도분석: 초기 ---------------------------------------
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 찬성
+  filter(연합구분 == "찬성") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = F, scales = "free_y") +
-  ggtitle("연합별 단어 빈도분석: 초기")
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ylim(0, 70) -> 빈도분석_초기_찬성
 
-data_tb_초기 %>%
-  group_by(연합구분) %>% 
-  count(단어) %>%
-  pivot_wider(
-    names_from = 연합구분,
-    values_from = n,
-    values_fill = list(n = 0)
-  ) %>%
-  mutate(
-    ratio_찬성 = ((찬성 + 1) / (sum(찬성 + 1))),
-    ratio_반대 = ((반대 + 1) / (sum(반대 + 1))),
-    odds_ratio = ratio_찬성 / ratio_반대
-  ) -> ratio_연합구분
-ratio_연합구분 %>% 
-  filter(rank(odds_ratio) <= 20 | rank(-odds_ratio) <= 20) %>%
-  arrange(-odds_ratio) %>%
-  print(n = Inf)
-
-ratio_연합구분 %>% 
-  mutate(log_odds_ratio = log(odds_ratio)) %>% 
-  group_by(연합구분 = ifelse(log_odds_ratio > 0, "찬성", "반대")) %>%
-  slice_max(abs(log_odds_ratio), n = 20, with_ties = F) -> top10_log
-
-top10_log %>% 
-  arrange(-log_odds_ratio) %>% 
-  select(단어, odds_ratio, log_odds_ratio, 연합구분)
-  
-
-top10_log %>% 
-  arrange(-log_odds_ratio) %>% 
-  select(단어, log_odds_ratio, 연합구분) %>% 
-  ggplot(aes(x = reorder(단어, log_odds_ratio),
-             y = log_odds_ratio,
-             fill = 연합구분)) +
-  theme_gray(base_family = "AppleGothic") +
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 중립
+  filter(연합구분 == "중립") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
   geom_col() +
   coord_flip() +
-  ylab("odds비") +
-  xlab("출현단어(명사)") +
-  ggtitle("연합별 단어 Odds비 분석: 초기")
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ylim(0, 70) -> 빈도분석_초기_중립
+
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 반대
+  filter(연합구분 == "반대") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ylim(0, 70) -> 빈도분석_초기_반대
+
+
+# 5.1.4. 가중로그승산비분석 : 초기 ----------------------------------
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 찬성
+  filter(연합구분 == "찬성") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_초기_찬성
+
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 중립
+  filter(연합구분 == "중립") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_초기_중립
+
+data_tf_idf_odds_초기 %>% # 단순빈도분석: 반대
+  filter(연합구분 == "반대") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 10,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_초기_반대
+
+grid.arrange(행위자_초기,
+                   arrangeGrob(
+                     빈도분석_초기_반대,
+                      빈도분석_초기_중립,
+                      빈도분석_초기_찬성,
+                   ncol = 1),
+                   arrangeGrob(
+                     가중로그승산비분석_초기_반대,
+                      가중로그승산비분석_초기_중립,
+                      가중로그승산비분석_초기_찬성,
+                   ncol = 1),
+  ncol=3, widths = c(1.5,1,1))
 
 
 
-# 중기_총선이전 (3월 18일 ~ 4월 14일)
-data_tb_word %>% 
+
+# 5.2.1. TF-IDF: 중기_총선이전 -------------------------------------
+data_tb_word_prep %>% 
   filter(시기 == "중기_총선이전") %>% 
   mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균"), "찬성", 
-                          ifelse(정보원 %in% c("통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부"), "반대", "중립"))) -> data_tb_중기_총선이전
+                          ifelse(정보원 %in% c("통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부"), "반대", "중립"))) %>%
+  filter(정보원 %in% c("청와대", "문재인대통령", "민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "정의당", "민주당", "민주당_이인영", "통합당_황교안", "민주당_이해찬", "민주당_이낙연", "광역자치단체_경기도", "민주당_박원순_광역자치단체", "민생당", "민주당_김경수_광역자치단체", "국무총리_정세균", "통합당_김종인", "통합당_유승민", "통합당_박형준", "통합당", "기획재정부_홍남기", "기획재정부")) %>% 
+  count(연합구분, 단어, sort = T) %>% 
+  bind_tf_idf(단어, 연합구분, n) -> data_tf_idf_중기_총선이전
 
-data_tb_중기_총선이전 %>% 
-  group_by(연합구분) %>% 
-  count(단어) %>% 
-  arrange(desc(n)) %>% 
-  slice_max(n, n = 10, with_ties = F) %>% 
-  ggplot(aes(x = fct_reorder(단어, n), y = n, fill = 연합구분)) +
+# 5.2.2. weighted_log_odds: 중기_총선이전 ------------------------
+data_tf_idf_중기_총선이전 %>% 
+  bind_log_odds(set = 연합구분,
+                feature = 단어,
+                n = n) %>% 
+  rename(log_odds = "log_odds_weighted") -> data_tf_idf_odds_중기_총선이전
+data_tf_idf_odds_중기_총선이전
+
+# 5.2.3. 단순빈도분석: 중기_총선이전 ---------------------------------------
+data_tf_idf_odds_중기_총선이전 %>% # 단순빈도분석: 찬성
+  filter(연합구분 == "찬성") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
   geom_col() +
   coord_flip() +
-  facet_wrap(~연합구분, drop = T, scales = "free_y") +
-  ggtitle("연합별 단어 빈도분석: 중기_총선이전")
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ggtitle("찬성") -> 빈도분석_중기_총선이전_찬성
 
-data_tb_중기_총선이전 %>%
-  group_by(연합구분) %>% 
-  count(단어) %>%
-  pivot_wider(
-    names_from = 연합구분,
-    values_from = n,
-    values_fill = list(n = 0)
-  ) %>%
-  mutate(
-    ratio_찬성 = ((찬성 + 1) / (sum(찬성 + 1))),
-    ratio_반대 = ((반대 + 1) / (sum(반대 + 1))),
-    odds_ratio = ratio_찬성 / ratio_반대
-  ) -> ratio_연합구분
-ratio_연합구분 %>% 
-  filter(rank(odds_ratio) <= 20 | rank(-odds_ratio) <= 20) %>%
-  arrange(-odds_ratio) %>%
-  print(n = Inf)
-
-ratio_연합구분 %>% 
-  mutate(log_odds_ratio = log(odds_ratio)) %>% 
-  group_by(연합구분 = ifelse(log_odds_ratio > 0, "찬성", "반대")) %>%
-  slice_max(abs(log_odds_ratio), n = 20, with_ties = F) -> top10_log
-top10_log %>% 
-  arrange(-log_odds_ratio) %>% 
-  select(단어, log_odds_ratio, 연합구분) %>% 
-  ggplot(aes(x = reorder(단어, log_odds_ratio),
-             y = log_odds_ratio,
-             fill = 연합구분)) +
-  theme_gray(base_family = "AppleGothic") +
+data_tf_idf_odds_중기_총선이전 %>% # 단순빈도분석: 중립
+  filter(연합구분 == "중립") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
   geom_col() +
   coord_flip() +
-  ylab("odds비") +
-  xlab("출현단어(명사)") +
-  ggtitle("연합별 단어 Odds비 분석: 중기_총선이전")
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ggtitle("중립") -> 빈도분석_중기_총선이전_중립
+
+data_tf_idf_odds_중기_총선이전 %>% # 단순빈도분석: 반대
+  filter(연합구분 == "반대") %>% 
+  mutate(단어 = reorder(단어, n)) %>%
+  slice_max(n, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = n), hjust = 1.2) +
+  xlab("") + ylab("") +
+  ggtitle("반대") -> 빈도분석_중기_총선이전_반대
+
+# 5.2.4. 가중로그승산비분석 : 중기_총선이전 ----------------------------------
+data_tf_idf_odds_중기_총선이전 %>% # 단순빈도분석: 찬성
+  filter(연합구분 == "찬성") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_중기_총선이전_찬성
+
+data_tf_idf_odds_중기_총선이 %>% # 단순빈도분석: 중립
+  filter(연합구분 == "중립") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_중기_총선이전_중립
+
+data_tf_idf_odds_중기_총선이전 %>% # 단순빈도분석: 반대
+  filter(연합구분 == "반대") %>% 
+  mutate(단어 = reorder(단어, log_odds)) %>%
+  slice_max(log_odds, n = 20,  with_ties = F) %>% 
+  ggplot(aes(x = fct_reorder(단어, log_odds), y = log_odds)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = round(log_odds, digits = 4)), hjust = 1.2) +
+  xlab("") + ylab("") -> 가중로그승산비분석_중기_총선이전_반대
+
+grid.arrange(
+  빈도분석_중기_총선이전_찬성,
+  빈도분석_중기_총선이전_반대,
+  가중로그승산비분석_중기_총선이전_찬성,
+  가중로그승산비분석_중기_총선이전_반대,
+  ncol=4)
 
 
 
-# 중기_총선이전 (4월 15일 ~ 4월 29일)
-data_tb %>% 
-  filter(시기 == "중기_총선이후")
 
-# 후기 (4월 30일 ~ 5월 4일)
-data_tb %>% 
-  filter(시기 == "후기") %>% 
-  filter(정보원 %>% str_detect("정부"))
+# 미국 추이 살펴보기 ------------------------------------------
 
-
-# 미국 추이 살펴보기
 
 predata_ver2 %>% 
   filter(정보원 %>%  str_detect("전문가집단_")) -> data_tb_미국
@@ -496,31 +575,3 @@ data_tb_미국 %>%
   ggplot(aes(x = fct_reorder(주차, 일자), y = n)) +
   geom_col() +
   ylim(0, 300)
-  
-  
-# 초기 담론 살펴보기
-data_tb %>% 
-  filter(시기 == "초기") %>% 
-  mutate(연합구분 = ifelse(정보원 %in% c("청와대", "문재인대통령", "민주당"), "중립", 
-                          ifelse(정보원 %in% c("민주당_김경수_광역자치단체", "민주당_이재명_광역자치단체", "민주당_박원순_광역자치단체", "정의당"), "찬성", "반대"))) %>% 
-  filter(연합구분 == "반대") %>% 
-  select(정보원, 인용문) %>%
-  filter(정보원 == "통합당_심재철") %>% 
-  head(20)
-
-# 데이터 정리 (네트워크를 위한 전처리)
-data_tb %>% 
-  group_by(id) %>% 
-  mutate(인용문 = SimplePos09(인용문) %>% 
-              unlist() %>% 
-              paste(collapse = " ") %>% 
-              str_extract_all(regex('[^\\s]+/N')) %>%
-              paste(collapse = ' ') %>% 
-              str_remove_all('/N') %>% 
-              str_remove_all(stopping_ko_end)
-  ) %>% 
-  ungroup() %>%
-  unnest_tokens(단어, 인용문) %>% 
-  anti_join(stopping_ko) %>% 
-  filter(str_length(단어) > 1) -> data_tb_SNA
-data_tb_SNA
