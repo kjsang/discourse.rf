@@ -332,8 +332,8 @@ data_tb_word_prep %>%
 data_tb_word_prep %>% 
   count(단어) %>% 
   filter(!n >= 2) -> anti_word
-data_tb_word_prep %<>% anti_join(anti_word) #  31,021
-data_tb_word_prep # 31,021
+data_tb_word_prep %<>% anti_join(anti_word) #  30,702
+data_tb_word_prep # 30,702
 
 
 # 5.1.1. TF-IDF: 초기 ---------------------s----------------
