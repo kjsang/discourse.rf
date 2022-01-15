@@ -705,9 +705,16 @@ data_tb_word_prep %>%
   count(정보원) %>% 
   arrange(desc(n))
 
+# 정보원 확인
 data_tb %>% 
   filter(정보원 %>% str_detect("광역자치단체")) %>% 
-  count(시기) %>% 
+  count(정보원) %>% 
+  arrange(desc(n))
+
+
+data_tb %>% 
+  filter(정보원 %>% str_detect("광역자치단체")) %>% 
+  count(시기) %>% ㅁ
   arrange(match(시기, c("초기", "중기", "후기"))) %>% 
   mutate(id = 1:3) %>% 
   ggplot(aes(x = fct_reorder(시기, id), y = n)) +
@@ -716,6 +723,17 @@ data_tb %>%
   ylab("담론 빈도") +
   geom_text(aes(label = n), vjust = -1) +
   ylim(0, 200)
+
+# 전체 출현 (광역자치단체)
+data_tb %>% 
+  count(시기) %>% 
+  arrange(match(시기, c("초기", "중기", "후기"))) %>% 
+  mutate(id = 1:3) %>% 
+  ggplot(aes(x = fct_reorder(시기, id), y = n)) +
+  geom_col() +
+  xlab("시기") +
+  ylab("담론 빈도") +
+  geom_text(aes(label = n), vjust = -1)
 
 data_tb_word_prep %>% 
   filter(정보원 %>% str_detect("광역자치단체")) %>% 
