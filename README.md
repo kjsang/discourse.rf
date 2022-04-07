@@ -14,20 +14,24 @@ Discursive Institutionalism, Policy Change, Policy Idea, Text Mining, Covid-19 A
 분석을 위해 tidyverse(Wickham et al., 2019), lubridate(Grolemund and Wickham, 2011), tidylo(Schnoebelen et al., 2020), tidytext(Silge, 2016), KoNLP(Jeon, 2016) 등의 패키지를 사용하였다.
 
 ### 2. 분석 시각화
-[그림 1] 긴급재난지원금 지급 담론 가중로그승산비 상위 단어 빈도 비교(전체 시기)
-![image](discourse.rf/picture/figure1.png)  
+[그림 1] 긴급재난지원금 지급 담론 가중로그승산비 상위 단어 빈도 비교(전체 시기)  
+![figure1](https://user-images.githubusercontent.com/75797388/162102030-4130f161-465d-4668-bdb2-e9a99809ea7e.png)
+
   
   
 [그림 2] 주요 행위자 출현 빈도 (2월 말 – 총선 이전)  
 초기  
-![image](discourse.rf/picture/figure2-1.png)
+![figure2-1](https://user-images.githubusercontent.com/75797388/162102039-7e09673a-7dc2-4e2f-8d29-a51f4c5c69d3.png)
+
   
 중기  
-![image](discourse.rf/picture/figure2-2.png)
+![figure2-2](https://user-images.githubusercontent.com/75797388/162102051-e58842cd-8173-4e2f-ac9d-e97830d8e359.png)
+
   
   
 [그림 3] 자치단체장 담론 네트워크 분석 (2월 말 – 총선 이전)  
-![image](discourse.rf/picture/figure3.png)
+![figure3](https://user-images.githubusercontent.com/75797388/162102060-9f4df3aa-037c-459a-9b03-f7f1e47d5b36.png)
+
 
 ### 3. 분석 결과
 논문 참조  
