@@ -15,19 +15,19 @@ Discursive Institutionalism, Policy Change, Policy Idea, Text Mining, Covid-19 A
 
 ### 2. 분석 시각화
 [그림 1] 긴급재난지원금 지급 담론 가중로그승산비 상위 단어 빈도 비교(전체 시기)
-![image](https://user-images.githubusercontent.com/75797388/162100945-14148301-f5ac-438d-889d-ae83ce5bdb85.png)  
+![image](discourse.rf/picture/figure1.png)  
   
   
 [그림 2] 주요 행위자 출현 빈도 (2월 말 – 총선 이전)  
 초기  
-![image](https://user-images.githubusercontent.com/75797388/162101017-30d0a08e-2283-4cf6-a592-73ce32b5944f.png)
+![image](discourse.rf/picture/figure2-1.png)
   
 중기  
-![image](https://user-images.githubusercontent.com/75797388/162101033-5b72c789-9eae-4f21-8de0-3bbf4e2b956a.png)
+![image](discourse.rf/picture/figure2-2.png)
   
   
 [그림 3] 자치단체장 담론 네트워크 분석 (2월 말 – 총선 이전)  
-![image](https://user-images.githubusercontent.com/75797388/162101112-264ff737-d1f1-4868-92db-7973c580a7d6.png)
+![image](discourse.rf/picture/figure3.png)
 
 ### 3. 분석 결과
 논문 참조  
